@@ -1,1 +1,39 @@
+---
+title: Introduction
+description: PayFlow API documentation — portfolio project
+---
+
+# PayFlow API
+
+PayFlow is a fictional payment processing API built for portfolio purposes.
+This documentation covers the core endpoints for managing invoices, disputes,
+and refunds.
+
+## Base URL
+
+https://api.payflow.io/v1
+
+## Authentication
+
+PayFlow uses API keys to authenticate requests. Include your API key in the
+`Authorization` header of every request:
+
+Authorization: Bearer your-api-key
+
+## Response format
+
+All responses are returned in JSON format. Successful requests return a `2xx`
+status code. Errors return a `4xx` or `5xx` status code with an `error` field
+describing the issue.
+
+## Status codes
+
+| Code | Meaning |
+|------|---------|
+| `200 OK` | Request succeeded. |
+| `201 Created` | Resource created successfully. |
+| `400 Bad Request` | Missing or invalid field in the request body. |
+| `401 Unauthorized` | API key is missing or invalid. |
+| `404 Not Found` | The requested resource does not exist. |
+| `422 Unprocessable Entity` | Request is valid but cannot be processed. |
 
