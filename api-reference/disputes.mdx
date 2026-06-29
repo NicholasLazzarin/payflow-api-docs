@@ -1,0 +1,147 @@
+---
+title: Disputes
+description: Open and list disputes in PayFlow
+---
+
+# Open a dispute
+
+Opens a formal dispute for an already processed transaction. Use this endpoint
+when a customer claims they do not recognize a charge or that a product was not
+delivered. PayFlow notifies you via `webhook_url` when the dispute status changes.
+If the merchant does not submit evidence by the `evidence_due_by` date, the dispute
+is automatically decided in the customer's favor.
+
+`POST /disputes`
+
+## Body parameters
+
+| Parameter        | Type    | Required | Description |
+|------------------|---------|----------|-------------|
+| `transaction_id` | string  | Yes      | The ID of the transaction that is being disputed. The transaction must exist in PayFlow. |
+| `reason`         | string  | Yes      | The reason the merchant is disputing the transaction. Accepted values: `not_recognized`, `product_not_delivered`, `duplicate_charge`, `product_unacceptable`. |
+| `evidence`       | object  | No       | Supporting evidence that the charge is legitimate. If not provided before `evidence_due_by`, the dispute is automatically decided in the customer's favor. |
+| `description`    | string  | No       | Free-text field for the merchant to explain the case. Maximum 1000 characters. |
+| `files`          | array   | No       | Array of URLs pointing to supporting documents already hosted by the merchant, such as delivery receipts or email records. Maximum 5 items. Each URL must be publicly accessible. |
+| `notify_customer`| boolean | No       | If `true`, the customer receives an email notifying them that a dispute has been opened. If `false`, no notification is sent — useful when the merchant prefers to resolve the issue without escalating it. Defaults to `true`. |
+| `metadata`       | object  | No       | Set of key-value pairs for storing internal references. PayFlow does not validate or process this data. |
+| `webhook_url`    | string  | No       | A URL that PayFlow calls with a POST request when the dispute status changes. Must be a valid HTTPS URL. |
+
+## Responses
+
+| Status | Meaning |
+|--------|---------|
+| `201 Created` | Dispute opened successfully. Returns the dispute object. |
+| `400 Bad Request` | The request body is missing a required field or contains an invalid value. Check the `error` field in the response for details. |
+| `401 Unauthorized` | The API key is missing or invalid. |
+| `404 Not Found` | The specified `transaction_id` does not exist. |
+| `422 Unprocessable Entity` | The request is valid but cannot be processed — for example, if the transaction is not in a disputable state. |
+
+## Example request
+
+```json
+{
+  "transaction_id": "txn_2c8f1a4e9b",
+  "reason": "product_not_delivered",
+  "evidence": {
+    "description": "The customer claims the product was not delivered. We have confirmation from the courier that the delivery was completed on 2026-06-20.",
+    "files": [
+      "https://yoursite.com/evidence/delivery-confirmation.pdf",
+      "https://yoursite.com/evidence/courier-receipt.pdf"
+    ]
+  },
+  "notify_customer": true,
+  "metadata": {
+    "environment": "production",
+    "team": "disputes"
+  },
+  "webhook_url": "https://yoursite.com/webhooks/payflow/disputes"
+}
+```
+
+## Example response — 201 Created
+
+```json
+{
+  "id": "dis_4f9a1b2c3d",
+  "transaction_id": "txn_2c8f1a4e9b",
+  "status": "open",
+  "reason": "product_not_delivered",
+  "evidence": {
+    "description": "The customer claims the product was not delivered. We have confirmation from the courier that the delivery was completed on 2026-06-20.",
+    "files": [
+      "https://yoursite.com/evidence/delivery-confirmation.pdf",
+      "https://yoursite.com/evidence/courier-receipt.pdf"
+    ]
+  },
+  "evidence_due_by": "2026-07-05T23:59:59Z",
+  "notify_customer": true,
+  "metadata": {
+    "environment": "production",
+    "team": "disputes"
+  },
+  "webhook_url": "https://yoursite.com/webhooks/payflow/disputes",
+  "created_at": "2026-06-25T14:30:00Z"
+}
+```
+
+---
+
+# List disputes
+
+Returns a paginated list of all disputes in your PayFlow account. Use the
+`status`, `from`, and `to` parameters to filter results, and `limit` and
+`offset` to control pagination.
+
+`GET /disputes`
+
+## Query parameters
+
+| Parameter | Type    | Required | Description |
+|-----------|---------|----------|-------------|
+| `status`  | string  | No       | Filters disputes by status. Accepted values: `open`, `under_review`, `won`, `lost`, `cancelled`. |
+| `from`    | string  | No       | Filters disputes created on or after this date. Format: ISO 8601 (e.g., `2026-01-01`). If provided, `to` is also required. |
+| `to`      | string  | No       | Filters disputes created on or before this date. Format: ISO 8601 (e.g., `2026-01-31`). If provided, `from` is also required. |
+| `limit`   | integer | No       | Maximum number of disputes to return per page. Minimum: `1`, maximum: `100`. Defaults to `20`. |
+| `offset`  | integer | No       | Number of disputes to skip before returning results. Use with `limit` to paginate through results. Minimum: `0`. Defaults to `0`. |
+
+## Responses
+
+| Status | Meaning |
+|--------|---------|
+| `200 OK` | Disputes retrieved successfully. Returns an array of dispute objects. If no disputes match the filters, returns an empty array. |
+| `401 Unauthorized` | The API key is missing or invalid. |
+| `422 Unprocessable Entity` | The request is valid but cannot be processed — for example, if `from` is provided without `to`, or if `from` is a date later than `to`. |
+
+## Example request
+
+```
+GET /disputes?status=open&from=2026-01-01&to=2026-01-31&limit=10&offset=0
+```
+
+## Example response — 200 OK
+
+```json
+{
+  "data": [
+    {
+      "id": "dis_4f9a1b2c3d",
+      "transaction_id": "txn_7x2k9z1m",
+      "reason": "product_not_delivered",
+      "status": "open",
+      "evidence_due_by": "2026-01-26T23:59:59Z",
+      "created_at": "2026-01-19T10:00:00Z"
+    },
+    {
+      "id": "dis_8e3c7d1f2a",
+      "transaction_id": "txn_3a8f2c9e",
+      "reason": "not_recognized",
+      "status": "open",
+      "evidence_due_by": "2026-01-27T23:59:59Z",
+      "created_at": "2026-01-20T10:00:00Z"
+    }
+  ],
+  "total": 2,
+  "limit": 10,
+  "offset": 0
+}
+```
