@@ -1,0 +1,176 @@
+---
+title: Invoices
+description: Create and retrieve invoices in PayFlow
+---
+
+# Create an invoice
+
+Generates an invoice and sends it to the customer by email. PayFlow
+automatically calculates the invoice total based on the provided items
+and applied tax rate. If the customer does not pay by the `due_date`,
+the invoice status changes to `expired` automatically.
+
+`POST /invoices`
+
+## Body parameters
+
+| Parameter    | Type    | Required | Description |
+|--------------|---------|----------|-------------|
+| `customer_id`| string  | Yes      | The ID of the customer who will receive the invoice. The customer must exist in PayFlow. |
+| `due_date`   | string  | Yes      | Payment deadline in ISO 8601 date format (e.g., `2026-07-01`). If the customer does not pay by this date, the invoice status automatically changes to `expired`. |
+| `items`      | array   | Yes      | Array of products or services included in the invoice. At least one item is required. PayFlow uses the `quantity` and `unit_price` of each item to calculate the invoice total. |
+| `name`       | string  | Yes      | Name of the product or service. |
+| `quantity`   | integer | Yes      | Number of units. Minimum: `1`. |
+| `unit_price` | integer | Yes      | Price per unit in the smallest currency unit (e.g., cents). Minimum: `0`. |
+| `tax_rate`   | number  | No       | Tax percentage applied to the invoice subtotal. For example, `10` applies a 10% tax. Minimum: `0`, maximum: `100`. |
+| `send_email` | boolean | No       | If `true`, PayFlow sends the invoice to the customer by email immediately after creation. If `false`, the invoice is created but no email is sent. Defaults to `true`. |
+| `notes`      | string  | No       | Free-text field that appears in the footer of the invoice the customer receives. Use it for payment instructions, terms, or a thank-you message. Maximum 500 characters. |
+| `metadata`   | object  | No       | Set of key-value pairs for storing internal references. PayFlow does not validate or process this data. |
+| `webhook_url`| string  | No       | A URL that PayFlow calls with a POST request when the invoice status changes. Must be a valid HTTPS URL. |
+
+## Responses
+
+| Status | Meaning |
+|--------|---------|
+| `201 Created` | Invoice created successfully. Returns the invoice object. |
+| `400 Bad Request` | The request body is missing a required field or contains an invalid value. Check the `error` field in the response for details. |
+| `401 Unauthorized` | The API key is missing or invalid. |
+| `404 Not Found` | The specified `customer_id` does not exist. |
+| `422 Unprocessable Entity` | The request is valid but cannot be processed. |
+
+## Example request
+
+```json
+{
+  "customer_id": "cus_7b3e2d9f1a",
+  "due_date": "2026-07-01",
+  "items": [
+    {
+      "name": "Laptop",
+      "quantity": 1,
+      "unit_price": 100000
+    },
+    {
+      "name": "Laptop Bag",
+      "quantity": 1,
+      "unit_price": 5000
+    }
+  ],
+  "tax_rate": 10,
+  "send_email": true,
+  "notes": "Thanks for shopping with us!",
+  "metadata": {
+    "internal_reference": "inv_00892"
+  },
+  "webhook_url": "https://yoursite.com/webhooks/payflow/invoices"
+}
+```
+
+## Example response — 201 Created
+
+```json
+{
+  "id": "inv_2c8f1a4e9b",
+  "status": "pending",
+  "customer_id": "cus_7b3e2d9f1a",
+  "due_date": "2026-07-01",
+  "items": [
+    {
+      "name": "Laptop",
+      "quantity": 1,
+      "unit_price": 100000,
+      "subtotal": 100000
+    },
+    {
+      "name": "Laptop Bag",
+      "quantity": 1,
+      "unit_price": 5000,
+      "subtotal": 5000
+    }
+  ],
+  "subtotal": 105000,
+  "tax_rate": 10,
+  "tax_amount": 10500,
+  "total": 115500,
+  "send_email": true,
+  "notes": "Thanks for shopping with us!",
+  "metadata": {
+    "internal_reference": "inv_00892"
+  },
+  "webhook_url": "https://yoursite.com/webhooks/payflow/invoices",
+  "created_at": "2026-06-25T14:30:00Z"
+}
+```
+
+---
+
+# Get an invoice
+
+Retrieves the details of a specific invoice by its ID. Use this endpoint
+to check the current status of an invoice or retrieve its full details
+after receiving a webhook notification.
+
+`GET /invoices/{id}`
+
+## Path parameters
+
+| Parameter | Type   | Required | Description |
+|-----------|--------|----------|-------------|
+| `id`      | string | Yes      | The ID of the invoice to retrieve. |
+
+## Query parameters
+
+| Parameter          | Type    | Required | Description |
+|--------------------|---------|----------|-------------|
+| `expand`           | array   | No       | List of related objects to include in the response. Accepted values: `customer`, `items`. By default, these objects are returned as IDs only. |
+| `include_payments` | boolean | No       | If `true`, returns an array with all payment attempts for this invoice, including failed ones — useful for debugging payment issues. Defaults to `false`. |
+
+## Responses
+
+| Status | Meaning |
+|--------|---------|
+| `200 OK` | Invoice retrieved successfully. Returns the invoice object. |
+| `401 Unauthorized` | The API key is missing or invalid. |
+| `404 Not Found` | The specified invoice `id` does not exist. |
+
+## Example request
+
+GET /invoices/inv_4f9a1b2c3d?expand=customer&include_payments=true
+
+## Example response — 200 OK
+
+```json
+{
+  "id": "inv_4f9a1b2c3d",
+  "status": "paid",
+  "due_date": "2026-07-01",
+  "customer": {
+    "id": "cus_7b3e2d9f1a",
+    "name": "Nicholas Oliveira",
+    "email": "nicholas@email.com"
+  },
+  "subtotal": 105000,
+  "tax_rate": 10,
+  "tax_amount": 10500,
+  "total": 115500,
+  "payments": [
+    {
+      "id": "pay_8675ab",
+      "status": "failed",
+      "amount": 115500,
+      "created_at": "2026-06-20T10:00:00Z"
+    },
+    {
+      "id": "pay_9231cd",
+      "status": "succeeded",
+      "amount": 115500,
+      "created_at": "2026-06-21T09:00:00Z"
+    }
+  ],
+  "metadata": {
+    "internal_reference": "inv_00892"
+  },
+  "created_at": "2026-06-18T14:30:00Z"
+}
+```
+
